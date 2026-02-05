@@ -69,3 +69,11 @@ def main():
 
     print("\nMissing dependencies detected.")
     install
+    print("\nMissing dependencies detected.")
+    install_packages(manager, missing_packages)
+
+    print("\nDependency installation complete.")
+
+if __name__ == "__main__":
+    main()
+
