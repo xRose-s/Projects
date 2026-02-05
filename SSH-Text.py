@@ -75,3 +75,4 @@ def main():
 if __name__ == "__main__":
     main()
 
+#your system should be setup to run this scriptS
