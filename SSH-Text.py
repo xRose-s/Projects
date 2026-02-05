@@ -3,6 +3,8 @@
 import subprocess
 import shutil
 import sys
+import os
+import time
 
 REQUIRED_TOOLS = {
     "tor": ["tor"],
@@ -10,6 +12,14 @@ REQUIRED_TOOLS = {
     "sshd": ["openssh-server"],
     "ncat": ["ncat", "nmap-ncat"]
 }
+
+TORRC_PATH = "/etc/tor/torrc"
+HIDDEN_SERVICE_DIR = "/var/lib/tor/ssh_p2p"
+HIDDEN_SERVICE_CONFIG = """
+# SSH P2P hidden service
+HiddenServiceDir /var/lib/tor/ssh_p2p/
+HiddenServicePort 22 127.0.0.1:22
+"""
 
 def run(cmd):
     return subprocess.run(cmd, shell=True)
@@ -44,6 +54,42 @@ def install_packages(manager, packages):
         print("Unsupported package manager.")
         sys.exit(1)
 
+def configure_tor():
+    print("\n=== Configuring Tor hidden service ===\n")
+
+    if not os.path.exists(TORRC_PATH):
+        print("Tor config not found.")
+        sys.exit(1)
+
+    with open(TORRC_PATH, "r") as f:
+        content = f.read()
+
+    if "HiddenServiceDir /var/lib/tor/ssh_p2p/" in content:
+        print("[OK] Hidden service already configured.")
+        return
+
+    print("Adding hidden service config...")
+    with open(TORRC_PATH, "a") as f:
+        f.write("\n" + HIDDEN_SERVICE_CONFIG + "\n")
+
+def restart_tor():
+    print("\nRestarting Tor service...")
+    run("systemctl restart tor")
+    time.sleep(5)
+
+def show_onion_address():
+    hostname_file = f"{HIDDEN_SERVICE_DIR}/hostname"
+
+    if not os.path.exists(hostname_file):
+        print("Onion hostname not created yet.")
+        return
+
+    with open(hostname_file, "r") as f:
+        onion = f.read().strip()
+
+    print("\n=== NODE READY ===")
+    print(f"Your onion address:\n{onion}\n")
+
 def main():
     print("\n=== Checking system dependencies ===\n")
 
@@ -63,16 +109,16 @@ def main():
             print(f"[MISSING] {tool}")
             missing_packages.append(pkg_options[0])
 
-    if not missing_packages:
+    if missing_packages:
+        print("\nMissing dependencies detected.")
+        install_packages(manager, missing_packages)
+        print("\nDependency installation complete.")
+    else:
         print("\nAll dependencies are installed.")
-        sys.exit(0)
 
-    print("\nMissing dependencies detected.")
-    install_packages(manager, missing_packages)
-
-    print("\nDependency installation complete.")
+    configure_tor()
+    restart_tor()
+    show_onion_address()
 
 if __name__ == "__main__":
     main()
-
-#your system should be setup to run this scriptS
