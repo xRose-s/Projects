@@ -68,8 +68,6 @@ def main():
         sys.exit(0)
 
     print("\nMissing dependencies detected.")
-    install
-    print("\nMissing dependencies detected.")
     install_packages(manager, missing_packages)
 
     print("\nDependency installation complete.")
