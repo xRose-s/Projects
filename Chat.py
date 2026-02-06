@@ -86,8 +86,17 @@ def auto_chat(onion):
         PORT,
     ]
 
-    current_process = subprocess.Popen(ssh_command)
-    current_process.wait()
+    for i in range(3):
+        try:
+            current_process = subprocess.Popen(ssh_command)
+            current_process.wait()
+            return
+        except Exception:
+            print("Retrying connection...")
+            time.sleep(3)
+        
+    print("Waiting for peer to join....")
+    listener_thread.join()
 
 
 # -----------------------------
