@@ -57,7 +57,9 @@ def listen():
     print(f"Listening on port {PORT}...\n")
     print("Waiting for peer...\n")
 
-    subprocess.run(["ncat", "-l", PORT])
+    global current_process
+    current_process = subprocess.Popen(["ncat", "-l", PORT])
+    current_process.wait()
 
 
 def connect(onion):
@@ -79,7 +81,9 @@ def connect(onion):
         PORT,
     ]
 
-    subprocess.run(ssh_command)
+    global current_process
+    current_process = subprocess.Popen(ssh_command)
+    current_process.wait()
 
 def shutdown(signum, frame):
     global current_process
@@ -100,7 +104,9 @@ def usage():
 
 
 def main():
-    # Default = listener
+    signal.signal(signal.SIGINT, shutdown)
+    
+    
     if len(sys.argv) < 2:
         listen()
         return
