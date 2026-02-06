@@ -15,17 +15,25 @@ REQUIRED_TOOLS = {
 
 TORRC_PATH = "/etc/tor/torrc"
 HIDDEN_SERVICE_DIR = "/var/lib/tor/ssh_p2p"
+
 HIDDEN_SERVICE_CONFIG = """
-# SSH P2P hidden service
+# SSH + Chat P2P hidden service
 HiddenServiceDir /var/lib/tor/ssh_p2p/
 HiddenServicePort 22 127.0.0.1:22
+HiddenServicePort 9000 127.0.0.1:9000
 """
 
+
+# -----------------------------
+# helpers
+# -----------------------------
 def run(cmd):
     return subprocess.run(cmd, shell=True)
 
+
 def command_exists(cmd):
     return shutil.which(cmd) is not None
+
 
 def detect_package_manager():
     if command_exists("apt"):
@@ -37,6 +45,10 @@ def detect_package_manager():
     else:
         return None
 
+
+# -----------------------------
+# package installation
+# -----------------------------
 def install_packages(manager, packages):
     print(f"\nInstalling missing packages: {packages}\n")
 
@@ -54,6 +66,10 @@ def install_packages(manager, packages):
         print("Unsupported package manager.")
         sys.exit(1)
 
+
+# -----------------------------
+# tor configuration
+# -----------------------------
 def configure_tor():
     print("\n=== Configuring Tor hidden service ===\n")
 
@@ -64,7 +80,7 @@ def configure_tor():
     with open(TORRC_PATH, "r") as f:
         content = f.read()
 
-    if "HiddenServiceDir /var/lib/tor/ssh_p2p/" in content:
+    if HIDDEN_SERVICE_DIR in content:
         print("[OK] Hidden service already configured.")
         return False
 
@@ -80,9 +96,11 @@ def restart_tor():
     run("systemctl restart tor")
     time.sleep(5)
 
+
 def stop_tor():
     print("\nStopping Tor service...")
     run("systemctl stop tor")
+
 
 def show_onion_address():
     hostname_file = f"{HIDDEN_SERVICE_DIR}/hostname"
@@ -97,6 +115,10 @@ def show_onion_address():
     print("\n=== NODE READY ===")
     print(f"Your onion address:\n{onion}\n")
 
+
+# -----------------------------
+# main
+# -----------------------------
 def main():
     print("\n=== Checking system dependencies ===\n")
 
@@ -117,17 +139,19 @@ def main():
             missing_packages.append(pkg_options[0])
 
     if missing_packages:
-        print("\nMissing dependencies detected.")
         install_packages(manager, missing_packages)
         print("\nDependency installation complete.")
     else:
-        print("\nAll dependencies are installed.")
+        print("\nAll dependencies installed.")
 
     changed = configure_tor()
+
     hostname_file = f"{HIDDEN_SERVICE_DIR}/hostname"
     if changed or not os.path.exists(hostname_file):
         restart_tor()
+
     show_onion_address()
+
     stop_tor()
 
 
