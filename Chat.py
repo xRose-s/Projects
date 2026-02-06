@@ -5,10 +5,10 @@ import sys
 import getpass
 import time
 import signal
-
-current_process = None
+import threading
 
 PORT = "9000"
+current_process = None
 
 
 # -----------------------------
@@ -34,7 +34,7 @@ def ensure_service(service):
 
 
 def ensure_ssh():
-    # Works across distros
+    # distro-safe SSH handling
     if service_running("ssh"):
         ensure_service("ssh")
     else:
@@ -48,29 +48,33 @@ def ensure_runtime():
 
 
 # -----------------------------
-# Chat functions
+# Chat logic
 # -----------------------------
-def listen():
-    ensure_runtime()
-
-    print("\n=== Chat Listener ===")
-    print(f"Listening on port {PORT}...\n")
-    print("Waiting for peer...\n")
-    print ("Press Ctrl+C to close the chat")
-
+def listen_background():
     global current_process
     current_process = subprocess.Popen(["ncat", "-l", PORT])
     current_process.wait()
 
 
-def connect(onion):
+def auto_chat(onion):
+    global current_process
+
     ensure_runtime()
+
+    print("\nPreparing peer connection...\n")
+
+    # Start background listener
+    listener_thread = threading.Thread(
+        target=listen_background,
+        daemon=True
+    )
+    listener_thread.start()
+
+    time.sleep(2)
 
     user = getpass.getuser()
 
-    print("\n=== Connecting ===")
-    print(f"User: {user}")
-    print(f"Target: {onion}\n")
+    print("Trying outbound connection...\n")
 
     ssh_command = [
         "ssh",
@@ -82,51 +86,36 @@ def connect(onion):
         PORT,
     ]
 
-    global current_process
     current_process = subprocess.Popen(ssh_command)
     current_process.wait()
 
+
+# -----------------------------
+# Shutdown handling
+# -----------------------------
 def shutdown(signum, frame):
     global current_process
-    print("\n \nClosing chat... ")
-    
+
+    print("\n\nClosing chat gracefully...\n")
+
     if current_process:
-        current_process.terminate
+        current_process.terminate()
+
     sys.exit(0)
 
 
 # -----------------------------
-# CLI
+# CLI entry
 # -----------------------------
-def usage():
-    print("\nUsage:")
-    print("  chat.py listen")
-    print("  chat.py connect <onion>\n")
-
-
 def main():
     signal.signal(signal.SIGINT, shutdown)
-    
-    
+
     if len(sys.argv) < 2:
-        listen()
-        return
+        print("Usage: chat.py <peer.onion>")
+        sys.exit(1)
 
-    command = sys.argv[1]
-
-    if command == "listen":
-        listen()
-
-    elif command == "connect":
-        if len(sys.argv) < 3:
-            usage()
-            sys.exit(1)
-
-        onion = sys.argv[2]
-        connect(onion)
-
-    else:
-        usage()
+    onion = sys.argv[1]
+    auto_chat(onion)
 
 
 if __name__ == "__main__":
