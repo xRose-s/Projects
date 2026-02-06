@@ -27,18 +27,24 @@ def service_running(service):
 def ensure_service(service):
     if service_running(service):
         print(f"[OK] {service} running")
-        return
+        return True
 
     print(f"Starting {service}...")
     subprocess.run(["sudo", "systemctl", "start", service])
     time.sleep(2)
 
+    return service_running(service)
 
+
+# ✅ FIXED SSH HANDLING
 def ensure_ssh():
-    if service_running("ssh"):
-        ensure_service("ssh")
-    else:
-        ensure_service("sshd")
+    # try both service names
+    if ensure_service("ssh"):
+        return
+    if ensure_service("sshd"):
+        return
+
+    print("[WARN] Could not start SSH service.")
 
 
 def ensure_runtime():
