@@ -6,11 +6,12 @@ import sys
 import os
 import time
 
+# -----------------------------
+# Config
+# -----------------------------
 REQUIRED_TOOLS = {
     "tor": ["tor"],
-    "ssh": ["openssh-server", "openssh"],
-    "sshd": ["openssh-server"],
-    "ncat": ["ncat", "nmap-ncat"]
+    "ncat": ["ncat", "nmap-ncat"],
 }
 
 TORRC_PATH = "/etc/tor/torrc"
@@ -23,9 +24,8 @@ HiddenServicePort 22 127.0.0.1:22
 HiddenServicePort 9000 127.0.0.1:9000
 """
 
-
 # -----------------------------
-# helpers
+# Helpers
 # -----------------------------
 def run(cmd):
     return subprocess.run(cmd, shell=True)
@@ -38,16 +38,15 @@ def command_exists(cmd):
 def detect_package_manager():
     if command_exists("apt"):
         return "apt"
-    elif command_exists("dnf"):
+    if command_exists("dnf"):
         return "dnf"
-    elif command_exists("pacman"):
+    if command_exists("pacman"):
         return "pacman"
-    else:
-        return None
+    return None
 
 
 # -----------------------------
-# package installation
+# Package installation
 # -----------------------------
 def install_packages(manager, packages):
     print(f"\nInstalling missing packages: {packages}\n")
@@ -68,7 +67,43 @@ def install_packages(manager, packages):
 
 
 # -----------------------------
-# tor configuration
+# SSH handling (cross-distro)
+# -----------------------------
+def ensure_ssh_running():
+    services = ["ssh", "sshd"]
+
+    for svc in services:
+        result = subprocess.run(
+            ["systemctl", "is-active", svc],
+            capture_output=True,
+            text=True
+        )
+
+        if result.stdout.strip() == "active":
+            print(f"[OK] {svc} running")
+            return
+
+    # try starting services
+    for svc in services:
+        print(f"Trying to start {svc}...")
+        subprocess.run(["systemctl", "start", svc])
+        time.sleep(2)
+
+        result = subprocess.run(
+            ["systemctl", "is-active", svc],
+            capture_output=True,
+            text=True
+        )
+
+        if result.stdout.strip() == "active":
+            print(f"[OK] {svc} started")
+            return
+
+    print("[WARN] Could not start SSH service.")
+
+
+# -----------------------------
+# Tor configuration
 # -----------------------------
 def configure_tor():
     print("\n=== Configuring Tor hidden service ===\n")
@@ -102,6 +137,9 @@ def stop_tor():
     run("systemctl stop tor")
 
 
+# -----------------------------
+# Onion address
+# -----------------------------
 def show_onion_address():
     hostname_file = f"{HIDDEN_SERVICE_DIR}/hostname"
 
@@ -117,7 +155,7 @@ def show_onion_address():
 
 
 # -----------------------------
-# main
+# Main flow
 # -----------------------------
 def main():
     print("\n=== Checking system dependencies ===\n")
@@ -143,6 +181,9 @@ def main():
         print("\nDependency installation complete.")
     else:
         print("\nAll dependencies installed.")
+
+    # ensure ssh works across distros
+    ensure_ssh_running()
 
     changed = configure_tor()
 
