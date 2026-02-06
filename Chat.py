@@ -4,6 +4,9 @@ import subprocess
 import sys
 import getpass
 import time
+import signal
+
+current_process = None
 
 PORT = "9000"
 
@@ -77,6 +80,14 @@ def connect(onion):
     ]
 
     subprocess.run(ssh_command)
+
+def shutdown(signum, frame):
+    global current_process
+    print("\n \nClosing chat... ")
+    
+    if current_process:
+        current_process.terminate
+    sys.exit(0)
 
 
 # -----------------------------
