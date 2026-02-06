@@ -56,6 +56,7 @@ def listen():
     print("\n=== Chat Listener ===")
     print(f"Listening on port {PORT}...\n")
     print("Waiting for peer...\n")
+    print ("Press Ctrl+C to close the chat")
 
     global current_process
     current_process = subprocess.Popen(["ncat", "-l", PORT])
