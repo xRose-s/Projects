@@ -66,11 +66,14 @@ def configure_tor():
 
     if "HiddenServiceDir /var/lib/tor/ssh_p2p/" in content:
         print("[OK] Hidden service already configured.")
-        return
+        return False
 
     print("Adding hidden service config...")
     with open(TORRC_PATH, "a") as f:
         f.write("\n" + HIDDEN_SERVICE_CONFIG + "\n")
+
+    return True
+
 
 def restart_tor():
     print("\nRestarting Tor service...")
@@ -121,17 +124,12 @@ def main():
         print("\nAll dependencies are installed.")
 
     changed = configure_tor()
-
-    if changed:
-    restart_tor()
-
+    hostname_file = f"{HIDDEN_SERVICE_DIR}/hostname"
+    if changed or not os.path.exists(hostname_file):
+        restart_tor()
     show_onion_address()
     stop_tor()
 
-
-    configure_tor()
-    restart_tor()
-    show_onion_address()
 
 if __name__ == "__main__":
     main()
