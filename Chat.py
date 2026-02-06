@@ -8,6 +8,9 @@ import time
 PORT = "9000"
 
 
+# -----------------------------
+# Service helpers
+# -----------------------------
 def service_running(service):
     result = subprocess.run(
         ["systemctl", "is-active", service],
@@ -27,12 +30,23 @@ def ensure_service(service):
     time.sleep(2)
 
 
+def ensure_ssh():
+    # Works across distros
+    if service_running("ssh"):
+        ensure_service("ssh")
+    else:
+        ensure_service("sshd")
+
+
 def ensure_runtime():
     print("\n=== Checking runtime services ===\n")
     ensure_service("tor")
-    ensure_service("ssh")
+    ensure_ssh()
 
 
+# -----------------------------
+# Chat functions
+# -----------------------------
 def listen():
     ensure_runtime()
 
@@ -65,6 +79,9 @@ def connect(onion):
     subprocess.run(ssh_command)
 
 
+# -----------------------------
+# CLI
+# -----------------------------
 def usage():
     print("\nUsage:")
     print("  chat.py listen")
@@ -72,9 +89,10 @@ def usage():
 
 
 def main():
+    # Default = listener
     if len(sys.argv) < 2:
-        usage()
-        sys.exit(1)
+        listen()
+        return
 
     command = sys.argv[1]
 
