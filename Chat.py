@@ -6,9 +6,10 @@ import getpass
 import time
 import signal
 import threading
+import os
 
 PORT = "9000"
-current_process = None
+processes = []
 
 
 # -----------------------------
@@ -34,7 +35,6 @@ def ensure_service(service):
 
 
 def ensure_ssh():
-    # distro-safe SSH handling
     if service_running("ssh"):
         ensure_service("ssh")
     else:
@@ -48,22 +48,46 @@ def ensure_runtime():
 
 
 # -----------------------------
+# Cleanup helpers
+# -----------------------------
+def cleanup_port():
+    subprocess.run(
+        ["sudo", "pkill", "-f", f"ncat.*{PORT}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def cleanup_processes():
+    for p in processes:
+        try:
+            p.terminate()
+            p.wait(timeout=2)
+        except Exception:
+            pass
+
+    cleanup_port()
+
+
+# -----------------------------
 # Chat logic
 # -----------------------------
 def listen_background():
-    global current_process
-    current_process = subprocess.Popen(["ncat", "-l", PORT])
-    current_process.wait()
+    p = subprocess.Popen(
+        ["ncat", "-l", PORT],
+        preexec_fn=os.setsid
+    )
+    processes.append(p)
+    p.wait()
 
 
 def auto_chat(onion):
-    global current_process
-
     ensure_runtime()
 
     print("\nPreparing peer connection...\n")
 
-    # Start background listener
+    cleanup_port()
+
     listener_thread = threading.Thread(
         target=listen_background,
         daemon=True
@@ -86,30 +110,29 @@ def auto_chat(onion):
         PORT,
     ]
 
-    for i in range(3):
+    for _ in range(3):
         try:
-            current_process = subprocess.Popen(ssh_command)
-            current_process.wait()
+            p = subprocess.Popen(
+                ssh_command,
+                preexec_fn=os.setsid
+            )
+            processes.append(p)
+            p.wait()
             return
         except Exception:
             print("Retrying connection...")
             time.sleep(3)
-        
-    print("Waiting for peer to join....")
+
+    print("Waiting for peer to join...")
     listener_thread.join()
 
 
 # -----------------------------
 # Shutdown handling
 # -----------------------------
-def shutdown(signum, frame):
-    global current_process
-
+def shutdown(signum=None, frame=None):
     print("\n\nClosing chat gracefully...\n")
-
-    if current_process:
-        current_process.terminate()
-
+    cleanup_processes()
     sys.exit(0)
 
 
@@ -118,6 +141,7 @@ def shutdown(signum, frame):
 # -----------------------------
 def main():
     signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
 
     if len(sys.argv) < 2:
         print("Usage: chat.py <peer.onion>")
