@@ -77,6 +77,10 @@ def restart_tor():
     run("systemctl restart tor")
     time.sleep(5)
 
+def stop_tor():
+    print("\nStopping Tor service...")
+    run("systemctl stop tor")
+
 def show_onion_address():
     hostname_file = f"{HIDDEN_SERVICE_DIR}/hostname"
 
@@ -115,6 +119,15 @@ def main():
         print("\nDependency installation complete.")
     else:
         print("\nAll dependencies are installed.")
+
+    changed = configure_tor()
+
+    if changed:
+    restart_tor()
+
+    show_onion_address()
+    stop_tor()
+
 
     configure_tor()
     restart_tor()
