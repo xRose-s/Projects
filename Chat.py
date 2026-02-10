@@ -102,7 +102,7 @@ def host_mode():
 
     onion = input("Enter peer onion address: ").strip()
 
-    user = getpass.getuser()
+    user = input("Enter Remote Username :   ")
 
     print("\nWaiting for peer to start listener...")
     input("Press ENTER when peer is ready...")
