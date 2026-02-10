@@ -36,9 +36,7 @@ def ensure_service(service):
     return service_running(service)
 
 
-# ✅ FIXED SSH HANDLING
 def ensure_ssh():
-    # try both service names
     if ensure_service("ssh"):
         return
     if ensure_service("sshd"):
@@ -78,36 +76,37 @@ def cleanup_processes():
 # -----------------------------
 # Chat logic
 # -----------------------------
-def listen_background():
+def listen_mode():
+    ensure_runtime()
+
+    cleanup_port()
+
+    print("\n=== Listener Mode ===")
+    print("Waiting for peer...\n")
+    print("Press Ctrl+C to exit\n")
+
     p = subprocess.Popen(
-        ["ncat", "-l", PORT],
+        ["ncat", "-l", "127.0.0.1", PORT],
         preexec_fn=os.setsid
     )
     processes.append(p)
     p.wait()
 
 
-def auto_chat(onion):
+def host_mode():
     ensure_runtime()
 
-    print("\nPreparing peer connection...\n")
-
-    cleanup_port()
-
-    listener_thread = threading.Thread(
-        target=listen_background,
-        daemon=True
-    )
-    listener_thread.start()
-
-    time.sleep(2)
+    onion = input("Enter peer onion address: ").strip()
 
     user = getpass.getuser()
 
-    print("Trying outbound connection...\n")
+    print("\nWaiting for peer to start listener...")
+    input("Press ENTER when peer is ready...")
 
+    # ✅ SSH fix added here
     ssh_command = [
         "ssh",
+        "-o", "StrictHostKeyChecking=accept-new",
         "-o",
         "ProxyCommand=ncat --proxy 127.0.0.1:9050 --proxy-type socks5 %h %p",
         f"{user}@{onion}",
@@ -116,21 +115,12 @@ def auto_chat(onion):
         PORT,
     ]
 
-    for _ in range(3):
-        try:
-            p = subprocess.Popen(
-                ssh_command,
-                preexec_fn=os.setsid
-            )
-            processes.append(p)
-            p.wait()
-            return
-        except Exception:
-            print("Retrying connection...")
-            time.sleep(3)
-
-    print("Waiting for peer to join...")
-    listener_thread.join()
+    p = subprocess.Popen(
+        ssh_command,
+        preexec_fn=os.setsid
+    )
+    processes.append(p)
+    p.wait()
 
 
 # -----------------------------
@@ -143,21 +133,32 @@ def shutdown(signum=None, frame=None):
 
 
 # -----------------------------
-# CLI entry
+# Menu
+# -----------------------------
+def menu():
+    print("\nSelect mode:")
+    print("1) Host (connect)")
+    print("2) Listener (wait)")
+    choice = input("> ").strip()
+
+    if choice == "1":
+        host_mode()
+    elif choice == "2":
+        listen_mode()
+    else:
+        print("Invalid choice.")
+        menu()
+
+
+# -----------------------------
+# Entry
 # -----------------------------
 def main():
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    if len(sys.argv) < 2:
-        print("Usage: chat.py <peer.onion>")
-        sys.exit(1)
-
-    onion = sys.argv[1]
-    auto_chat(onion)
+    menu()
 
 
 if __name__ == "__main__":
     main()
-
-#Comment for the Day 
