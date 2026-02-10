@@ -32,7 +32,7 @@ class teacher {
 
 }
 
-// Method overloading
+// Method overriding
 
 class AnimalSound {
     void sound() {

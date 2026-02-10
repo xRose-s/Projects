@@ -30,7 +30,11 @@ def ensure_service(service):
         return True
 
     print(f"Starting {service}...")
-    subprocess.run(["sudo", "systemctl", "start", service])
+    subprocess.run(
+        ["sudo", "systemctl", "start", service],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     time.sleep(2)
 
     return service_running(service)
@@ -115,10 +119,7 @@ def host_mode():
         PORT,
     ]
 
-    p = subprocess.Popen(
-        ssh_command,
-        preexec_fn=os.setsid
-    )
+    p = subprocess.Popen(ssh_command)
     processes.append(p)
     p.wait()
 
