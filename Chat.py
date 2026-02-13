@@ -2,14 +2,45 @@
 
 import subprocess
 import sys
-import getpass
 import time
 import signal
-import threading
 import os
 
 PORT = "9000"
 processes = []
+
+
+# -----------------------------
+# DEBUG HELPERS
+# -----------------------------
+def run_debug(cmd):
+    print(f"\n[DEBUG] Running: {' '.join(cmd)}")
+    subprocess.run(cmd)
+
+
+def debug_state(stage):
+    print(f"\n========== DEBUG STATE: {stage} ==========")
+
+    print("\nTor status:")
+    run_debug(["systemctl", "is-active", "tor"])
+
+    print("\nSSH status:")
+    run_debug(["systemctl", "is-active", "ssh"])
+    run_debug(["systemctl", "is-active", "sshd"])
+
+    print("\nPort listeners:")
+    run_debug(["ss", "-lntp"])
+
+    print("\nNcat processes:")
+    run_debug(["pgrep", "-a", "ncat"])
+
+    print("\nSSH processes:")
+    run_debug(["pgrep", "-a", "ssh"])
+
+    print("\nTor SOCKS port:")
+    run_debug(["ss", "-lntp", "|", "grep", "9050"])
+
+    print("\n===========================================")
 
 
 # -----------------------------
@@ -30,11 +61,7 @@ def ensure_service(service):
         return True
 
     print(f"Starting {service}...")
-    subprocess.run(
-        ["sudo", "systemctl", "start", service],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    subprocess.run(["sudo", "systemctl", "start", service])
     time.sleep(2)
 
     return service_running(service)
@@ -45,7 +72,6 @@ def ensure_ssh():
         return
     if ensure_service("sshd"):
         return
-
     print("[WARN] Could not start SSH service.")
 
 
@@ -53,6 +79,7 @@ def ensure_runtime():
     print("\n=== Checking runtime services ===\n")
     ensure_service("tor")
     ensure_ssh()
+    debug_state("runtime-ready")
 
 
 # -----------------------------
@@ -67,6 +94,7 @@ def cleanup_port():
 
 
 def cleanup_processes():
+    print("\n[DEBUG] Cleaning up processes...")
     for p in processes:
         try:
             p.terminate()
@@ -75,6 +103,7 @@ def cleanup_processes():
             pass
 
     cleanup_port()
+    debug_state("after-cleanup")
 
 
 # -----------------------------
@@ -87,7 +116,8 @@ def listen_mode():
 
     print("\n=== Listener Mode ===")
     print("Waiting for peer...\n")
-    print("Press Ctrl+C to exit\n")
+
+    debug_state("before-listen")
 
     p = subprocess.Popen(
         ["ncat", "-l", "127.0.0.1", PORT],
@@ -96,18 +126,20 @@ def listen_mode():
     processes.append(p)
     p.wait()
 
+    debug_state("listener-exit")
+
 
 def host_mode():
     ensure_runtime()
 
     onion = input("Enter peer onion address: ").strip()
-
     user = input("Enter Remote Username :   ")
 
-    print("\nWaiting for peer to start listener...")
-    input("Press ENTER when peer is ready...")
+    print("\nWaiting for peer...")
+    input("Press ENTER when peer ready...")
 
-    # ✅ SSH fix added here
+    debug_state("before-connect")
+
     ssh_command = [
         "ssh",
         "-o", "StrictHostKeyChecking=accept-new",
@@ -123,12 +155,14 @@ def host_mode():
     processes.append(p)
     p.wait()
 
+    debug_state("after-connect")
+
 
 # -----------------------------
-# Shutdown handling
+# Shutdown
 # -----------------------------
 def shutdown(signum=None, frame=None):
-    print("\n\nClosing chat gracefully...\n")
+    print("\nClosing chat gracefully...\n")
     cleanup_processes()
     sys.exit(0)
 
@@ -138,8 +172,9 @@ def shutdown(signum=None, frame=None):
 # -----------------------------
 def menu():
     print("\nSelect mode:")
-    print("1) Host (connect)")
-    print("2) Listener (wait)")
+    print("1) Host")
+    print("2) Listener")
+
     choice = input("> ").strip()
 
     if choice == "1":
@@ -147,7 +182,6 @@ def menu():
     elif choice == "2":
         listen_mode()
     else:
-        print("Invalid choice.")
         menu()
 
 
@@ -163,8 +197,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-#FIRST SUCSSESFULLL RUNNNNNNNYYAYAYAYYAYA
