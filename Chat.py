@@ -87,7 +87,7 @@ def ensure_runtime():
 # -----------------------------
 def cleanup_port():
     subprocess.run(
-        ["sudo", "pkill", "-9", "-f", "ncat"],
+        ["sudo", "pkill", "-f", f"ncat.*{PORT}"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -95,15 +95,15 @@ def cleanup_port():
 
 def cleanup_processes():
     print("\n[DEBUG] Cleaning up processes...")
-
     for p in processes:
         try:
-            os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+            p.terminate()
+            p.wait(timeout=2)
         except Exception:
             pass
 
     cleanup_port()
-    time.sleep(1)
+    debug_state("after-cleanup")
 
 
 # -----------------------------
@@ -151,10 +151,7 @@ def host_mode():
         PORT,
     ]
 
-    p = subprocess.Popen(
-        ssh_command,
-        preexec_fn=os.setsid
-    )
+    p = subprocess.Popen(ssh_command)
     processes.append(p)
     p.wait()
 
